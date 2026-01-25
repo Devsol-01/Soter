@@ -13,6 +13,7 @@ import { RequestCorrelationMiddleware } from './middleware/request-correlation.m
 import { SecurityModule } from './common/security/security.module';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { CampaignsModule } from './campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { join } from 'node:path';
     AuditModule,
     SecurityModule,
     TestErrorModule,
+    CampaignsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
