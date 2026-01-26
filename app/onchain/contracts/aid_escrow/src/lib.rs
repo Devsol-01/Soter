@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, token, Address, Env, Map, String, Symbol,
+    Address, Env, Map, String, Symbol, contract, contracterror, contractimpl, contracttype, token,
 };
 
 // --- Storage Keys ---
@@ -74,7 +74,7 @@ impl AidEscrow {
 
     // --- Funding & Packages ---
 
-    /// Funds the contract (Pool Model). 
+    /// Funds the contract (Pool Model).
     /// Transfers `amount` of `token` from `from` to this contract.
     /// This increases the contract's balance, allowing new packages to be created.
     pub fn fund(env: Env, token: Address, from: Address, amount: i128) -> Result<(), Error> {
@@ -120,7 +120,7 @@ impl AidEscrow {
         // 2. Check Solvency (Available Balance vs Locked)
         let token_client = token::Client::new(&env, &token);
         let contract_balance = token_client.balance(&env.current_contract_address());
-        
+
         let mut locked_map: Map<Address, i128> = env
             .storage()
             .instance()
@@ -287,36 +287,34 @@ impl AidEscrow {
             .get(&key)
             .ok_or(Error::PackageNotFound)?;
 
-        // Can only refund if Expired or Cancelled. 
+        // Can only refund if Expired or Cancelled.
         // If Created, must Revoke first. If Claimed, impossible.
         // If Refunded, impossible.
         if package.status == PackageStatus::Created {
-             // Check if actually expired
-             if package.expires_at > 0 && env.ledger().timestamp() > package.expires_at {
+            // Check if actually expired
+            if package.expires_at > 0 && env.ledger().timestamp() > package.expires_at {
                 package.status = PackageStatus::Expired;
                 // If we just expired it, we need to unlock the funds first
                 Self::decrement_locked(&env, &package.token, package.amount);
-             } else {
-                 return Err(Error::InvalidState); // Must revoke first
-             }
-        } else if package.status == PackageStatus::Claimed || package.status == PackageStatus::Refunded {
-             return Err(Error::InvalidState);
+            } else {
+                return Err(Error::InvalidState); // Must revoke first
+            }
+        } else if package.status == PackageStatus::Claimed
+            || package.status == PackageStatus::Refunded
+        {
+            return Err(Error::InvalidState);
         }
-        
+
         // If Cancelled, funds were already unlocked in `revoke`.
         // If Expired (logic above), funds were just unlocked.
-        
+
         // State Transition
         package.status = PackageStatus::Refunded;
         env.storage().persistent().set(&key, &package);
 
         // Transfer Contract -> Admin
         let token_client = token::Client::new(&env, &package.token);
-        token_client.transfer(
-            &env.current_contract_address(),
-            &admin,
-            &package.amount,
-        );
+        token_client.transfer(&env.current_contract_address(), &admin, &package.amount);
 
         let topics = (Symbol::new(&env, "refunded"), id, admin);
         env.events().publish(topics, package.amount);
@@ -332,16 +330,23 @@ impl AidEscrow {
             .instance()
             .get(&KEY_TOTAL_LOCKED)
             .unwrap_or(Map::new(env));
-        
+
         let current = locked_map.get(token.clone()).unwrap_or(0);
-        let new_locked = if current > amount { current - amount } else { 0 };
-        
+        let new_locked = if current > amount {
+            current - amount
+        } else {
+            0
+        };
+
         locked_map.set(token.clone(), new_locked);
         env.storage().instance().set(&KEY_TOTAL_LOCKED, &locked_map);
     }
 
     pub fn get_package(env: Env, id: u64) -> Result<Package, Error> {
-         let key = (Symbol::new(&env, "pkg"), id);
-         env.storage().persistent().get(&key).ok_or(Error::PackageNotFound)
+        let key = (Symbol::new(&env, "pkg"), id);
+        env.storage()
+            .persistent()
+            .get(&key)
+            .ok_or(Error::PackageNotFound)
     }
 }

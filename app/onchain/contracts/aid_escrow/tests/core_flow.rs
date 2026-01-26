@@ -1,7 +1,11 @@
 #![cfg(test)]
 
-use crate::{AidEscrow, AidEscrowClient, PackageStatus, Error};
-use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, token};
+use crate::{AidEscrow, AidEscrowClient, Error, PackageStatus};
+use soroban_sdk::{
+    Address, Env,
+    testutils::{Address as _, Ledger},
+    token,
+};
 
 fn setup_token(env: &Env, admin: &Address) -> token::Client<'static> {
     let token_contract = env.register_stellar_asset_contract(admin.clone());
@@ -70,18 +74,14 @@ fn test_solvency_check() {
     client.fund(&token_client.address, &admin, &1000);
 
     // Try creating package > available balance
-    let res = client.try_create_package(
-        &1, &recipient, &2000, &token_client.address, &0
-    );
+    let res = client.try_create_package(&1, &recipient, &2000, &token_client.address, &0);
     assert_eq!(res, Err(Ok(Error::InsufficientFunds)));
 
     // Create valid package using all funds
     client.create_package(&2, &recipient, &1000, &token_client.address, &0);
-    
+
     // Try creating another package (funds are locked)
-    let res2 = client.try_create_package(
-        &3, &recipient, &1, &token_client.address, &0
-    );
+    let res2 = client.try_create_package(&3, &recipient, &1, &token_client.address, &0);
     assert_eq!(res2, Err(Ok(Error::InsufficientFunds)));
 }
 
@@ -119,12 +119,12 @@ fn test_expiry_and_refund() {
     // Admin refunds
     // Balance before refund: Admin has 0 (minted 1000, funded 1000)
     assert_eq!(token_client.balance(&admin), 0);
-    
+
     client.refund(&pkg_id);
 
     // Balance after refund: Admin gets 500 back
     assert_eq!(token_client.balance(&admin), 500);
-    
+
     let pkg = client.get_package(&pkg_id);
     assert_eq!(pkg.status, PackageStatus::Refunded);
 }
@@ -151,7 +151,7 @@ fn test_revoke_flow() {
 
     // Revoke
     client.revoke(&pkg_id);
-    
+
     let pkg = client.get_package(&pkg_id);
     assert_eq!(pkg.status, PackageStatus::Cancelled);
 

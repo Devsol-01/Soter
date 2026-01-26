@@ -1,7 +1,11 @@
 #![cfg(test)]
 
 use aid_escrow::{AidEscrow, AidEscrowClient, Error, PackageStatus};
-use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, token};
+use soroban_sdk::{
+    Address, Env,
+    testutils::{Address as _, Ledger},
+    token,
+};
 
 // Helper to setup a token for testing solvency checks
 fn setup_token(env: &Env, admin: &Address) -> token::Client<'static> {
@@ -19,7 +23,7 @@ fn test_integration_flow() {
     let admin = Address::generate(&env);
     let recipient = Address::generate(&env);
     let token_admin = Address::generate(&env);
-    
+
     // 1. Setup Token and Fund Admin
     let token_client = setup_token(&env, &token_admin);
     token_client.mint(&admin, &10_000);
@@ -39,13 +43,13 @@ fn test_integration_flow() {
     // Note: ID is now manual, expires_at is absolute timestamp
     let pkg_id = 0;
     let expires_at = env.ledger().timestamp() + 86400; // 1 day from now
-    
+
     let returned_id = client.create_package(
-        &pkg_id, 
-        &recipient, 
-        &1000, 
-        &token_client.address, 
-        &expires_at
+        &pkg_id,
+        &recipient,
+        &1000,
+        &token_client.address,
+        &expires_at,
     );
     assert_eq!(returned_id, pkg_id);
 
@@ -86,7 +90,7 @@ fn test_multiple_packages() {
     let client = AidEscrowClient::new(&env, &contract_id);
 
     client.init(&admin);
-    
+
     // Fund contract with enough for both packages
     token_client.mint(&admin, &10_000);
     client.fund(&token_client.address, &admin, &5000);
@@ -123,7 +127,7 @@ fn test_error_cases() {
     let client = AidEscrowClient::new(&env, &contract_id);
 
     client.init(&admin);
-    
+
     // Fund context
     token_client.mint(&admin, &10000);
     client.fund(&token_client.address, &admin, &5000);
