@@ -1,12 +1,13 @@
 #![no_std]
 
 use soroban_sdk::{
-    Address, Env, Map, String, Symbol, contract, contracterror, contractimpl, contracttype, token,
+    Address, Env, Map, String, Symbol, contract, contracterror, contractevent, contractimpl,
+    contracttype, symbol_short, token,
 };
 
 // --- Storage Keys ---
-const KEY_ADMIN: Symbol = Symbol::short("admin");
-const KEY_TOTAL_LOCKED: Symbol = Symbol::short("locked"); // Map<Address, i128>
+const KEY_ADMIN: Symbol = symbol_short!("admin");
+const KEY_TOTAL_LOCKED: Symbol = symbol_short!("locked"); // Map<Address, i128>
 
 // --- Data Types ---
 
@@ -50,6 +51,50 @@ pub enum Error {
     InvalidState = 11, // Transition not allowed
 }
 
+// --- Contract Events ---
+
+#[contractevent]
+pub struct FundEvent {
+    pub from: Address,
+    pub token: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct PackageCreatedEvent {
+    pub id: u64,
+    pub recipient: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct ClaimedEvent {
+    pub id: u64,
+    pub recipient: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct DisbursedEvent {
+    pub id: u64,
+    pub admin: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct RevokedEvent {
+    pub id: u64,
+    pub admin: Address,
+    pub amount: i128,
+}
+
+#[contractevent]
+pub struct RefundedEvent {
+    pub id: u64,
+    pub admin: Address,
+    pub amount: i128,
+}
+
 #[contract]
 pub struct AidEscrow;
 
@@ -88,8 +133,14 @@ impl AidEscrow {
         token_client.transfer(&from, &env.current_contract_address(), &amount);
 
         // Emit event
-        let topics = (Symbol::new(&env, "fund"), from, token);
-        env.events().publish(topics, amount);
+        env.events().publish(
+            (symbol_short!("fund"),),
+            FundEvent {
+                from,
+                token,
+                amount,
+            },
+        );
 
         Ok(())
     }
@@ -112,7 +163,7 @@ impl AidEscrow {
         }
 
         // 1. Check ID Uniqueness
-        let key = (Symbol::new(&env, "pkg"), id);
+        let key = (symbol_short!("pkg"), id);
         if env.storage().persistent().has(&key) {
             return Err(Error::PackageIdExists);
         }
@@ -153,8 +204,14 @@ impl AidEscrow {
         env.storage().persistent().set(&key, &package);
 
         // Emit Event
-        let topics = (Symbol::new(&env, "package_created"), id, recipient);
-        env.events().publish(topics, amount);
+        env.events().publish(
+            (symbol_short!("pkg_crtd"),),
+            PackageCreatedEvent {
+                id,
+                recipient,
+                amount,
+            },
+        );
 
         Ok(id)
     }
@@ -163,7 +220,7 @@ impl AidEscrow {
 
     /// Recipient claims the package.
     pub fn claim(env: Env, id: u64) -> Result<(), Error> {
-        let key = (Symbol::new(&env, "pkg"), id);
+        let key = (symbol_short!("pkg"), id);
         let mut package: Package = env
             .storage()
             .persistent()
@@ -202,8 +259,14 @@ impl AidEscrow {
         );
 
         // Emit Event
-        let topics = (Symbol::new(&env, "claimed"), id, package.recipient);
-        env.events().publish(topics, package.amount);
+        env.events().publish(
+            (symbol_short!("claimed"),),
+            ClaimedEvent {
+                id,
+                recipient: package.recipient,
+                amount: package.amount,
+            },
+        );
 
         Ok(())
     }
@@ -215,7 +278,7 @@ impl AidEscrow {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
-        let key = (Symbol::new(&env, "pkg"), id);
+        let key = (symbol_short!("pkg"), id);
         let mut package: Package = env
             .storage()
             .persistent()
@@ -241,8 +304,14 @@ impl AidEscrow {
             &package.amount,
         );
 
-        let topics = (Symbol::new(&env, "disbursed"), id, admin);
-        env.events().publish(topics, package.amount);
+        env.events().publish(
+            (symbol_short!("disbursed"),),
+            DisbursedEvent {
+                id,
+                admin: admin.clone(),
+                amount: package.amount,
+            },
+        );
 
         Ok(())
     }
@@ -252,7 +321,7 @@ impl AidEscrow {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
-        let key = (Symbol::new(&env, "pkg"), id);
+        let key = (symbol_short!("pkg"), id);
         let mut package: Package = env
             .storage()
             .persistent()
@@ -270,8 +339,14 @@ impl AidEscrow {
         // Unlock funds (return to pool)
         Self::decrement_locked(&env, &package.token, package.amount);
 
-        let topics = (Symbol::new(&env, "revoked"), id, admin);
-        env.events().publish(topics, package.amount);
+        env.events().publish(
+            (symbol_short!("revoked"),),
+            RevokedEvent {
+                id,
+                admin: admin.clone(),
+                amount: package.amount,
+            },
+        );
 
         Ok(())
     }
@@ -280,7 +355,7 @@ impl AidEscrow {
         let admin = Self::get_admin(env.clone())?;
         admin.require_auth();
 
-        let key = (Symbol::new(&env, "pkg"), id);
+        let key = (symbol_short!("pkg"), id);
         let mut package: Package = env
             .storage()
             .persistent()
@@ -316,8 +391,14 @@ impl AidEscrow {
         let token_client = token::Client::new(&env, &package.token);
         token_client.transfer(&env.current_contract_address(), &admin, &package.amount);
 
-        let topics = (Symbol::new(&env, "refunded"), id, admin);
-        env.events().publish(topics, package.amount);
+        env.events().publish(
+            (symbol_short!("refunded"),),
+            RefundedEvent {
+                id,
+                admin: admin.clone(),
+                amount: package.amount,
+            },
+        );
 
         Ok(())
     }
@@ -343,7 +424,7 @@ impl AidEscrow {
     }
 
     pub fn get_package(env: Env, id: u64) -> Result<Package, Error> {
-        let key = (Symbol::new(&env, "pkg"), id);
+        let key = (symbol_short!("pkg"), id);
         env.storage()
             .persistent()
             .get(&key)
