@@ -20,11 +20,19 @@ export class RolesGuard implements CanActivate {
       return true; // No role required
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<{
+      headers: Record<string, string | string[] | undefined>;
+    }>();
 
     // Simple header/api-key stub for demo purposes
-    const userRole = request.headers['x-role'] as string;
-    if (!userRole || !requiredRoles.includes(userRole)) {
+    const userRole = request.headers['x-role'];
+    const role =
+      typeof userRole === 'string'
+        ? userRole
+        : Array.isArray(userRole)
+          ? userRole[0]
+          : undefined;
+    if (!role || !requiredRoles.includes(role)) {
       throw new ForbiddenException('Access denied: insufficient role');
     }
 

@@ -1,6 +1,3 @@
-/* eslint-disable 
-  @typescript-eslint/no-unsafe-assignment
-*/
 import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { Campaign, CampaignStatus, Prisma } from '@prisma/client';
