@@ -20,6 +20,8 @@ import {
   createRateLimiter,
 } from './common/security/security.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { APP_GUARD } from '@nestjs/core';
+import { ApiKeyGuard } from './common/guards/api-key.guard';
 import { ObservabilityModule } from './observability/observability.module';
 import { ClaimsModule } from './claims/claims.module';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
@@ -66,11 +68,12 @@ import { LoggerService } from './logger/logger.service';
   ],
 
   controllers: [AppController],
-
   providers: [
     AppService,
-
-    // Global structured logging interceptor
+    {
+      provide: APP_GUARD,
+      useClass: ApiKeyGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
